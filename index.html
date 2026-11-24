@@ -97,6 +97,7 @@ dialog::backdrop{background:#10141899}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
 pre,.scroll{overflow-x:auto}
 @media(max-width:600px){.bar{position:static}.srow select{flex:1 1 45%}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}.wall{height:180px}.mlab{font-size:11px}}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.form-grid label{display:flex;flex-direction:column;gap:5px;color:var(--mute);font-weight:600}.form-grid input,.form-grid select,.form-grid textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}.form-grid .full{grid-column:1/-1}
 </style>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -123,7 +124,7 @@ pre,.scroll{overflow-x:auto}
   <div id="hits" class="hits" hidden></div>
   <div class="row" style="justify-content:space-between">
     <nav class="tabs" id="tabs">
-      <a href="#overview">Overview</a><a href="#events">Events</a><a href="#travel">Travel</a><a href="#leads">Leads</a>
+      <a href="#overview">Overview</a><a href="#events">Events</a><a href="#travel">Travel</a><a href="#leads">Leads</a><a href="#add-event">Add Event</a>
     </nav>
     <div class="row">
       <button class="btn" id="btnImport">Import Excel</button>
@@ -172,6 +173,27 @@ pre,.scroll{overflow-x:auto}
     <div id="trTable"></div>
   </section>
 
+  <section class="view" id="v-add-event" hidden>
+    <div style="max-width:1000px;margin:auto;padding:20px;border:1px solid var(--line);border-radius:12px">
+      <h2>Add a new event</h2>
+      <p class="note">Submit event details. The Google Sheets write connection must be configured for submissions to be saved centrally.</p>
+      <form id="addEventForm" class="form-grid">
+        <label>Event name *<input name="name" required></label>
+        <label>Month<select name="month" id="addMonth"><option value="">Auto from start date</option></select></label>
+        <label>Start date<input name="start" type="date"></label><label>End date<input name="end" type="date"></label>
+        <label>Region / City *<input name="region" required placeholder="Country or city"></label>
+        <label>Category<select name="category" id="addCategory"></select></label>
+        <label>Attendees (comma separated)<input name="attendees" placeholder="Names"></label>
+        <label>Leads<input name="leads" type="number" min="0"></label><label>Contacts<input name="contacts" type="number" min="0"></label>
+        <label>Registration USD<input name="reg" type="number" step="any"></label><label>Booth setup USD<input name="setup" type="number" step="any"></label>
+        <label>Marketing USD<input name="mkt" type="number" step="any"></label><label>Logistics USD<input name="logistics" type="number" step="any"></label>
+        <label>Travel & stay USD<input name="travelCost" type="number" step="any"></label><label>Booth no.<input name="booth"></label>
+        <label>Revenue expected 3 mo USD<input name="rev3" type="number" step="any"></label><label>Revenue expected 6 mo USD<input name="rev6" type="number" step="any"></label><label>Revenue expected 1 yr USD<input name="rev12" type="number" step="any"></label>
+        <label class="full">Feedback<textarea name="feedback" rows="3"></textarea></label><label class="full">Notes<textarea name="notes" rows="3"></textarea></label>
+        <div class="full row"><button class="btn pri" type="submit">Submit event to Google Sheet</button><button class="btn" type="reset">Clear form</button><span id="addEventStatus" class="note"></span></div>
+      </form>
+    </div>
+  </section>
   <section class="view" id="v-leads" hidden>
     <div class="tools">
       <select id="fStage" aria-label="Stage"><option value="">All stages</option><option>New</option><option>Contacted</option><option>Qualified</option><option>Proposal</option><option>Won</option><option>Lost</option></select>
@@ -283,8 +305,9 @@ function render(){
   $('#subline').textContent=S.events.length?`Showing ${scope}. `+(apiMode?'Shared with everyone who has the link.':fileMode?'':local?'Saved in this browser.':'Updated live for everyone with access.'):'No events yet: import an Excel file or add your first event.';
   $('#btnAdd').hidden=$('#btnImport').hidden=!canWrite;
   if(!canWrite&&S.events.length)$('#subline').textContent+=' View only — contact the owner to make changes.';
-  ({overview:rOverview,events:rEvents,travel:rTravel,leads:rLeads})[tab](ev);
-  $('#btnAdd').textContent='+ Add '+(tab==='overview'?'event':SPEC[tab].label);
+  if(tab!=='add-event')({overview:rOverview,events:rEvents,travel:rTravel,leads:rLeads})[tab](ev);
+  $('#btnAdd').hidden=tab==='add-event'||!canWrite;
+  $('#btnAdd').textContent='+ Add '+(tab==='overview'?'event':SPEC[tab]?.label||'event');
 }
 function rOverview(ev){
   const tr=fTravel(),ld=fLeads();
@@ -461,7 +484,7 @@ async function handleFile(f){
 
 /* ---------- events & wiring ---------- */
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2600)}
-function route(){tab=['overview','events','travel','leads'].includes(location.hash.slice(1))?location.hash.slice(1):'overview';
+function route(){tab=['overview','events','travel','leads','add-event'].includes(location.hash.slice(1))?location.hash.slice(1):'overview';
   document.querySelectorAll('section.view').forEach(s=>s.hidden=s.id!=='v-'+tab);
   document.querySelectorAll('#tabs a').forEach(a=>a.setAttribute('aria-current',a.getAttribute('href')==='#'+tab?'page':'false'));render()}
 addEventListener('hashchange',route);
@@ -540,6 +563,10 @@ async function loadFile(){
 }
 function goLocal(why){local=true;try{Object.assign(S,JSON.parse(localStorage.getItem('iwave-tracker'))||{})}catch(e){}
   const b=$('#mode');b.hidden=false;b.textContent=why+' Changes are kept in this browser only — use Export Excel to back up or share.';render()}
+// Add Event tab submission (Google Apps Script endpoint required for writes)
+const EVENT_WRITE_URL='PASTE_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+(function setupAddEventTab(){const mm=document.querySelector('#addMonth'),cc=document.querySelector('#addCategory');if(mm)mm.innerHTML='<option value="">Auto from start date</option>'+MON.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');if(cc)cc.innerHTML=CATS.map(c=>`<option>${esc(c)}</option>`).join('');})();
+$('#addEventForm')?.addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget,status=$('#addEventStatus');const data=Object.fromEntries(new FormData(form).entries());if(!data.month&&data.start)data.month=String(new Date(data.start+'T00:00:00').getMonth()+1);data.attendees=(data.attendees||'').split(',').map(x=>x.trim()).filter(Boolean);for(const k of ['leads','contacts','reg','setup','mkt','logistics','travelCost','rev3','rev6','rev12'])data[k]=data[k]?Number(data[k]):'';data.dates=[data.start,data.end].filter(Boolean).join(' – ');status.textContent='Submitting…';if(EVENT_WRITE_URL.includes('PASTE_')){status.textContent='Write connection is not set up yet. Deploy the Google Apps Script and add its URL to this HTML.';return;}try{await fetch(EVENT_WRITE_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(data)});status.textContent='Submitted. Check the Events sheet in a few seconds.';form.reset();}catch(err){status.textContent='Submission failed: '+err.message;}});
 route();
 const timer=setTimeout(()=>{if(!db)goLocal('Shared storage could not be reached.')},10000);
 (async()=>{
