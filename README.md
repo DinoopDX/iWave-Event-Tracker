@@ -1,4 +1,4 @@
-# iWave Events 2026 Tracker
+# iWave Events Tracker
 
 A browser-based dashboard for tracking events, travel, budgets, and leads.
 
